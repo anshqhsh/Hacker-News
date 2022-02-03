@@ -25,20 +25,18 @@ function newsFeed() {
 
   const newsList = [];
 
-  // let template = `
-  // <div>
-  //   <h1>Hacker News</h1>
-  //   <ul>
-  //     {{__news_feed__}}
-  //   </ul>
-  //   <div>
-  //     <a href="#/page/{{__prev_page__}}">이전 페이지</a>
-  //     <a href="#/page/{{__next_page__}}">다음 페이지</a>
-  //   </div>
-  // </div>
-  // `;
-
-  newsList.push('<ul>');
+  let template = `
+  <div class="container mx-auto p-4">
+    <h1>Hacker News</h1>
+    <ul>
+      {{__news_feed__}}
+    </ul>
+    <div>
+      <a href="#/page/{{__prev_page__}}">이전 페이지</a>
+      <a href="#/page/{{__next_page__}}">다음 페이지</a>
+    </div>
+  </div>
+  `;
 
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push(`
@@ -49,26 +47,22 @@ function newsFeed() {
     </li>
   `);
   }
-  newsList.push('</ul>');
-  // 네비게이션
-  newsList.push(`
-    <div>
-      <a href ="#/page/${
-        store.currentPage > 1 ? store.currentPage - 1 : 1
-      }">이전페이지</a> 
-      <a href ="#/page/${
-        store.currentPage < store.maxPage
-          ? store.currentPage + 1
-          : store.maxPage
-      }">다음페이지</a> 
-    </div>
-  `);
-  container.innerHTML = newsList.join(''); // join을 이용 구분자 없는 합쳐진 html 문자열을 얻음
+
+  template = template.replace('{{__news_feed__}}', newsList.join('')); // 마크업을 대체
+  template = template.replace(
+    '{{__prev_page__}}',
+    store.currentPage > 1 ? store.currentPage - 1 : 1
+  );
+  template = template.replace(
+    '{{__next_page__}}',
+    store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage
+  );
+
+  container.innerHTML = template;
 }
 
 function newsDetail() {
   const id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
-  console.log(id);
   const newsContent = getData(CONTENT_URL.replace('@id', id));
 
   container.innerHTML = `

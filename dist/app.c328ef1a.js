@@ -144,35 +144,23 @@ function newsFeed() {
   var newsFeed = getData(NEWS_URL);
   var ul = document.createElement('ul'); //테그를 생성
 
-  var newsList = []; // let template = `
-  // <div>
-  //   <h1>Hacker News</h1>
-  //   <ul>
-  //     {{__news_feed__}}
-  //   </ul>
-  //   <div>
-  //     <a href="#/page/{{__prev_page__}}">이전 페이지</a>
-  //     <a href="#/page/{{__next_page__}}">다음 페이지</a>
-  //   </div>
-  // </div>
-  // `;
-
-  newsList.push('<ul>');
+  var newsList = [];
+  var template = "\n  <div class=\"container mx-auto p-4\">\n    <h1>Hacker News</h1>\n    <ul>\n      {{__news_feed__}}\n    </ul>\n    <div>\n      <a href=\"#/page/{{__prev_page__}}\">\uC774\uC804 \uD398\uC774\uC9C0</a>\n      <a href=\"#/page/{{__next_page__}}\">\uB2E4\uC74C \uD398\uC774\uC9C0</a>\n    </div>\n  </div>\n  ";
 
   for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push("\n    <li>\n      <a href=\"#/show/".concat(newsFeed[i].id, "\">\n        ").concat(newsFeed[i].title, "(").concat(newsFeed[i].comments_count, ")\n      </a>\n    </li>\n  "));
   }
 
-  newsList.push('</ul>'); // 네비게이션
+  template = template.replace('{{__news_feed__}}', newsList.join('')); // 마크업을 대체
 
-  newsList.push("\n    <div>\n      <a href =\"#/page/".concat(store.currentPage > 1 ? store.currentPage - 1 : 1, "\">\uC774\uC804\uD398\uC774\uC9C0</a> \n      <a href =\"#/page/").concat(store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage, "\">\uB2E4\uC74C\uD398\uC774\uC9C0</a> \n    </div>\n  "));
-  container.innerHTML = newsList.join(''); // join을 이용 구분자 없는 합쳐진 html 문자열을 얻음
+  template = template.replace('{{__prev_page__}}', store.currentPage > 1 ? store.currentPage - 1 : 1);
+  template = template.replace('{{__next_page__}}', store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage);
+  container.innerHTML = template;
 }
 
 function newsDetail() {
   var id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
 
-  console.log(id);
   var newsContent = getData(CONTENT_URL.replace('@id', id));
   container.innerHTML = "\n  <h1> ".concat(newsContent.title, "</h1>\n    <div>\n      <a href=\"#/page/").concat(store.currentPage, "\">\uBAA9\uB85D\uC73C\uB85C</a>\n    </div>\n  ");
 } // 화면전환 location.hash에서 #은 빈값을 반환함
