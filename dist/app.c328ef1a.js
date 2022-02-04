@@ -127,6 +127,8 @@ var CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json'; // 공유되는 값�
 
 var store = {
   currentPage: 1,
+  feeds: [],
+  //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
   maxPage: 0
 }; //네트워크를 통해 데이터를 가져와 객체로 변경
 
@@ -137,18 +139,33 @@ function getData(url) {
 
   store.maxPage = JSON.parse(ajax.response).length / 10;
   return JSON.parse(ajax.response); // json형식으로 변환
+} // 리스트에 읽음상태 추가
+
+
+function makeFeeds(feeds) {
+  for (var i = 0; i < feeds.length; i++) {
+    feeds[i].read = false;
+  }
+
+  return feeds;
 } // 글목록을 가져오는 함수
 
 
 function newsFeed() {
-  var newsFeed = getData(NEWS_URL);
+  var newsFeed = store.feeds;
   var ul = document.createElement('ul'); //테그를 생성
 
   var newsList = [];
-  var template = "\n  <div class=\"bg-gray-600 min-h-screen\">\n      <div class=\"bg-white text-xl\">\n        <div class=\"mx-auto px-4\">\n          <div class=\"flex justify-between items-center py-6\">\n            <div class=\"flex justify-start\">\n              <h1 class=\"font-extrabold\">Hacker News</h1>\n            </div>\n            <div class=\"items-center justify-end\">\n              <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n                Previous\n              </a>\n              <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n                Next\n              </a>\n            </div>\n          </div> \n        </div>\n      </div>\n      <div class=\"p-4 text-2xl text-gray-700\">\n        {{__news_feed__}}        \n      </div>\n    </div>\n  ";
+  var template = "\n  <div class=\"bg-gray-600 min-h-screen\">\n      <div class=\"bg-white text-xl\">\n        <div class=\"mx-auto px-4\">\n          <div class=\"flex justify-between items-center py-6\">\n            <div class=\"flex justify-start\">\n              <h1 class=\"font-extrabold\">Hacker News</h1>\n            </div>\n            <div class=\"items-center justify-end\">\n              <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n                Previous\n              </a>\n              <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n                Next\n              </a>\n            </div>\n          </div> \n        </div>\n      </div>\n      <div class=\"p-4 text-2xl text-gray-700\">\n        {{__news_feed__}}        \n      </div>\n    </div>\n  "; //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
+
+  if (newsFeed.length === 0) {
+    newsFeed = store.feeds = makeFeeds(getData(NEWS_URL));
+  }
+
+  console.log(newsFeed[0]);
 
   for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
-    newsList.push("\n    <div class=\"p-6 ".concat(newsFeed[i].read ? 'bg-red-500' : 'bg-white', " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n        <div class=\"flex\">\n          <div class=\"flex-auto\">\n            <a href=\"#/show/").concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, "</a>  \n          </div>\n          <div class=\"text-center text-sm\">\n            <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">").concat(newsFeed[i].comments_count, "</div>\n          </div>\n        </div>\n        <div class=\"flex mt-3\">\n          <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n            <div><i class=\"fas fa-user mr-1\"></i>").concat(newsFeed[i].user, "</div>\n            <div><i class=\"fas fa-heart mr-1\"></i>").concat(newsFeed[i].points, "</div>\n            <div><i class=\"far fa-clock mr-1\"></i>").concat(newsFeed[i].time_ago, "</div>\n          </div>  \n        </div>\n      </div>    \n  "));
+    newsList.push("\n    <div class=\"p-6 ".concat(newsFeed[i].read ? 'bg-green-500' : 'bg-white', " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n        <div class=\"flex\">\n          <div class=\"flex-auto\">\n            <a href=\"#/show/").concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, "</a>  \n          </div>\n          <div class=\"text-center text-sm\">\n            <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">").concat(newsFeed[i].comments_count, "</div>\n          </div>\n        </div>\n        <div class=\"flex mt-3\">\n          <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n            <div><i class=\"fas fa-user mr-1\"></i>").concat(newsFeed[i].user, "</div>\n            <div><i class=\"fas fa-heart mr-1\"></i>").concat(newsFeed[i].points, "</div>\n            <div><i class=\"far fa-clock mr-1\"></i>").concat(newsFeed[i].time_ago, "</div>\n          </div>  \n        </div>\n      </div>    \n  "));
   }
 
   template = template.replace('{{__news_feed__}}', newsList.join('')); // 마크업을 대체
@@ -156,7 +173,8 @@ function newsFeed() {
   template = template.replace('{{__prev_page__}}', store.currentPage > 1 ? store.currentPage - 1 : 1);
   template = template.replace('{{__next_page__}}', store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage);
   container.innerHTML = template;
-}
+} //읽는곳
+
 
 function newsDetail() {
   var id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
@@ -164,15 +182,22 @@ function newsDetail() {
   var newsContent = getData(CONTENT_URL.replace('@id', id));
   var template = "\n  <div class=\"bg-gray-600 min-h-screen pb-8\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/".concat(store.currentPage, "\" class=\"text-gray-500\">\n            <i class=\"fa fa-times\"></i>\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n    <h2>").concat(newsContent.title, "</h2>\n    <div class=\"text-gray-400 h-20\">\n      ").concat(newsContent.content, "\n    </div>\n\n    {{__comments__}}\n\n  </div>\n</div>\n  ");
 
+  for (var i = 0; i < store.feeds.length; i++) {
+    if (store.feeds[i].id === Number(id)) {
+      store.feeds[i].read = true;
+      break;
+    }
+  }
+
   function makeComment(comments) {
     var called = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : 0;
     var commentString = [];
 
-    for (var i = 0; i < comments.length; i++) {
-      commentString.push("\n        <div style=\"padding-left: ".concat(called * 40, "px;\" class=\"mt-4\">\n          <div class=\"text-gray-400\">\n            <i class=\"fa fa-sort-up mr-2\"></i>\n            <strong>").concat(comments[i].user, "</strong> ").concat(comments[i].time_ago, "\n          </div>\n          <p class=\"text-gray-700\">").concat(comments[i].content, "</p>\n        </div>      \n      ")); // 대댓글을 가져옴
+    for (var _i = 0; _i < comments.length; _i++) {
+      commentString.push("\n        <div style=\"padding-left: ".concat(called * 40, "px;\" class=\"mt-4\">\n          <div class=\"text-gray-400\">\n            <i class=\"fa fa-sort-up mr-2\"></i>\n            <strong>").concat(comments[_i].user, "</strong> ").concat(comments[_i].time_ago, "\n          </div>\n          <p class=\"text-gray-700\">").concat(comments[_i].content, "</p>\n        </div>      \n      ")); // 대댓글을 가져옴
 
-      if (comments[i].comments.length > 0) {
-        commentString.push(makeComment(comments[i].comments, called + 1)); // 재귀 호출 하위의 comment가 없을때까지 호출
+      if (comments[_i].comments.length > 0) {
+        commentString.push(makeComment(comments[_i].comments, called + 1)); // 재귀 호출 하위의 comment가 없을때까지 호출
       }
     }
 
@@ -228,7 +253,7 @@ var parent = module.bundle.parent;
 if ((!parent || !parent.isParcelRequire) && typeof WebSocket !== 'undefined') {
   var hostname = "" || location.hostname;
   var protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  var ws = new WebSocket(protocol + '://' + hostname + ':' + "50452" + '/');
+  var ws = new WebSocket(protocol + '://' + hostname + ':' + "49468" + '/');
 
   ws.onmessage = function (event) {
     checkedAssets = {};

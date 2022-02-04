@@ -6,6 +6,7 @@ const CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json';
 // 공유되는 값을 객체로 묶어줌
 const store = {
   currentPage: 1,
+  feeds: [], //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
   maxPage: 0,
 };
 
@@ -18,9 +19,17 @@ function getData(url) {
   return JSON.parse(ajax.response); // json형식으로 변환
 }
 
+// 리스트에 읽음상태 추가
+function makeFeeds(feeds) {
+  for (let i = 0; i < feeds.length; i++) {
+    feeds[i].read = false;
+  }
+  return feeds;
+}
+
 // 글목록을 가져오는 함수
 function newsFeed() {
-  const newsFeed = getData(NEWS_URL);
+  let newsFeed = store.feeds;
   const ul = document.createElement('ul'); //테그를 생성
 
   const newsList = [];
@@ -50,10 +59,16 @@ function newsFeed() {
     </div>
   `;
 
+  //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
+  if (newsFeed.length === 0) {
+    newsFeed = store.feeds = makeFeeds(getData(NEWS_URL));
+  }
+  console.log(newsFeed[0]);
+
   for (let i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
     newsList.push(`
     <div class="p-6 ${
-      newsFeed[i].read ? 'bg-red-500' : 'bg-white'
+      newsFeed[i].read ? 'bg-green-500' : 'bg-white'
     } mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100">
         <div class="flex">
           <div class="flex-auto">
@@ -89,6 +104,7 @@ function newsFeed() {
   container.innerHTML = template;
 }
 
+//읽는곳
 function newsDetail() {
   const id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
   const newsContent = getData(CONTENT_URL.replace('@id', id));
@@ -121,7 +137,12 @@ function newsDetail() {
   </div>
 </div>
   `;
-
+  for (let i = 0; i < store.feeds.length; i++) {
+    if (store.feeds[i].id === Number(id)) {
+      store.feeds[i].read = true;
+      break;
+    }
+  }
   function makeComment(comments, called = 0) {
     const commentString = [];
 
