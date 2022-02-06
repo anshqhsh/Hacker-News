@@ -38,48 +38,61 @@ const store: Store = {
   feeds: [], //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
 };
 
+function applyApiMixins(targetClass: any, baseClasses: any[]): void {
+  baseClasses.forEach(baseClass => {
+    Object.getOwnPropertyNames(baseClass.prototype).forEach(name => {
+      const descriptor = Object.getOwnPropertyDescriptor(
+        baseClass.prototype,
+        name
+      );
+
+      if (descriptor) {
+        Object.defineProperty(targetClass.prototype, name, descriptor);
+      }
+    });
+  });
+}
+
 // 공통요소로 네트워크로 api를 호출
 class Api {
-  // 내부 저장
-  url: string;
-  ajax: XMLHttpRequest;
-  // 클래스는 초기화 과정이 필요 url, XMLHttpRequest
-  // instance 객체에 저장
-  constructor(url: string) {
-    this.url = url;
-    this.ajax = new XMLHttpRequest();
-  }
+  protected getRequest<AjaxResponse>(url: string): AjaxResponse {
+    const ajax = new XMLHttpRequest();
 
-  protected getRequest<AjaxResponse>(): AjaxResponse {
-    this.ajax.open('GET', this.url, false); // 데이터를 동기적으로 가져옴
-    this.ajax.send(); //데이터를 가져옴
+    ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
+    ajax.send(); //데이터를 가져옴
 
-    return JSON.parse(this.ajax.response); // json형식으로 변환
+    return JSON.parse(ajax.response); // json형식으로 변환
   }
 }
 // 클래스를 통해서 더 확실한 목적을 갖게됨
-class NewsFeedApi extends Api {
+class NewsFeedApi {
   getData(): NewsFeed[] {
-    return this.getRequest<NewsFeed[]>();
+    return this.getRequest<NewsFeed[]>(NEWS_URL);
   }
 }
 
-class NewsDetailApi extends Api {
-  getData(): NewsDetail {
-    return this.getRequest<NewsDetail>();
+class NewsDetailApi {
+  getData(id: string): NewsDetail {
+    return this.getRequest<NewsDetail>(CONTENT_URL.replace('@id', id));
   }
 }
+interface NewsFeedApi extends Api {}
+interface NewsDetailApi extends Api {}
+
+// 상위 클래스 여럿을 받는 믹스인 구현
+applyApiMixins(NewsFeedApi, [Api]);
+applyApiMixins(NewsDetailApi, [Api]);
 
 // Generic 리턴값을 여러개 같을 경우가 존재해 사용하는곳에서 타입가드를 해줘야하지만
 // 제네릭을 통해 입력이 n개 유형일때 출력이 n개 유형인것을 표현 가능하다.
 // T라는 형식의 데이터의 리턴 값을 받겠다고 사용하는 곳에서 정의 내릴 수 있다.
 //네트워크를 통해 데이터를 가져와 객체로 변경
-function getData<AjaxResponse>(url: string): AjaxResponse {
-  ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
-  ajax.send(); //데이터를 가져옴
+// function getData<AjaxResponse>(url: string): AjaxResponse {
+//   ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
+//   ajax.send(); //데이터를 가져옴
 
-  return JSON.parse(ajax.response); // json형식으로 변환
-}
+//   return JSON.parse(ajax.response); // json형식으로 변환
+// }
 
 // 리스트에 읽음상태 추가
 function makeFeeds(feeds: NewsFeed[]): NewsFeed[] {
@@ -100,7 +113,7 @@ function updateView(html: string): void {
 // 글목록을 가져오는 함수
 function newsFeed(): void {
   // class를 사용해 가독성을 올릴수 있다
-  const api = new NewsFeedApi(NEWS_URL);
+  const api = new NewsFeedApi();
 
   let newsFeed: NewsFeed[] = store.feeds;
   const ul = document.createElement('ul'); //테그를 생성
@@ -180,8 +193,8 @@ function newsFeed(): void {
 //읽는곳
 function newsDetail(): void {
   const id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
-  const api = new NewsDetailApi(CONTENT_URL.replace('@id', id));
-  const newsContent = api.getData();
+  const api = new NewsDetailApi();
+  const newsContent = api.getData(id);
 
   let template = `
   <div class="bg-gray-600 min-h-screen pb-8">
