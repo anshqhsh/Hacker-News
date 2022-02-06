@@ -120,7 +120,50 @@ parcelRequire = (function (modules, cache, entry, globalName) {
 })({"app.ts":[function(require,module,exports) {
 "use strict";
 
-var container = document.getElementById('root'); //id값이 root를 불러옴
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
+var __values = this && this.__values || function (o) {
+  var s = typeof Symbol === "function" && Symbol.iterator,
+      m = s && o[s],
+      i = 0;
+  if (m) return m.call(o);
+  if (o && typeof o.length === "number") return {
+    next: function next() {
+      if (o && i >= o.length) o = void 0;
+      return {
+        value: o && o[i++],
+        done: !o
+      };
+    }
+  };
+  throw new TypeError(s ? "Object is not iterable." : "Symbol.iterator is not defined.");
+};
 
 var ajax = new XMLHttpRequest();
 var content = document.createElement('div');
@@ -131,33 +174,24 @@ var store = {
   currentPage: 1,
   feeds: [] //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
 
-};
-
-function applyApiMixins(targetClass, baseClasses) {
-  baseClasses.forEach(function (baseClass) {
-    Object.getOwnPropertyNames(baseClass.prototype).forEach(function (name) {
-      var descriptor = Object.getOwnPropertyDescriptor(baseClass.prototype, name);
-
-      if (descriptor) {
-        Object.defineProperty(targetClass.prototype, name, descriptor);
-      }
-    });
-  });
-} // 공통요소로 네트워크로 api를 호출
-
+}; // 공통요소로 네트워크로 api를 호출
 
 var Api =
 /** @class */
 function () {
-  function Api() {}
+  // 클래스는 초기화 과정이 필요 url, XMLHttpRequest
+  // instance 객체에 저장
+  function Api(url) {
+    this.url = url;
+    this.ajax = new XMLHttpRequest();
+  }
 
-  Api.prototype.getRequest = function (url) {
-    var ajax = new XMLHttpRequest();
-    ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
+  Api.prototype.getRequest = function () {
+    this.ajax.open('GET', this.url, false); // 데이터를 동기적으로 가져옴
 
-    ajax.send(); //데이터를 가져옴
+    this.ajax.send(); //데이터를 가져옴
 
-    return JSON.parse(ajax.response); // json형식으로 변환
+    return JSON.parse(this.ajax.response); // json형식으로 변환
   };
 
   return Api;
@@ -166,135 +200,258 @@ function () {
 
 var NewsFeedApi =
 /** @class */
-function () {
-  function NewsFeedApi() {}
+function (_super) {
+  __extends(NewsFeedApi, _super);
+
+  function NewsFeedApi() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
 
   NewsFeedApi.prototype.getData = function () {
-    return this.getRequest(NEWS_URL);
+    return this.getRequest();
   };
 
   return NewsFeedApi;
-}();
+}(Api);
 
 var NewsDetailApi =
 /** @class */
-function () {
-  function NewsDetailApi() {}
+function (_super) {
+  __extends(NewsDetailApi, _super);
 
-  NewsDetailApi.prototype.getData = function (id) {
-    return this.getRequest(CONTENT_URL.replace('@id', id));
+  function NewsDetailApi() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+
+  NewsDetailApi.prototype.getData = function () {
+    return this.getRequest();
   };
 
   return NewsDetailApi;
-}(); // 상위 클래스 여럿을 받는 믹스인 구현
+}(Api); // 공통요소를 코드 개선 부모 클래스에서 공통 요소를 뽑아 낸다
 
 
-applyApiMixins(NewsFeedApi, [Api]);
-applyApiMixins(NewsDetailApi, [Api]); // Generic 리턴값을 여러개 같을 경우가 존재해 사용하는곳에서 타입가드를 해줘야하지만
-// 제네릭을 통해 입력이 n개 유형일때 출력이 n개 유형인것을 표현 가능하다.
-// T라는 형식의 데이터의 리턴 값을 받겠다고 사용하는 곳에서 정의 내릴 수 있다.
-//네트워크를 통해 데이터를 가져와 객체로 변경
-// function getData<AjaxResponse>(url: string): AjaxResponse {
-//   ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
-//   ajax.send(); //데이터를 가져옴
-//   return JSON.parse(ajax.response); // json형식으로 변환
-// }
-// 리스트에 읽음상태 추가
+var View =
+/** @class */
+function () {
+  function View(containerId, template) {
+    var containerElement = document.getElementById(containerId);
 
-function makeFeeds(feeds) {
-  for (var i = 0; i < feeds.length; i++) {
-    feeds[i].read = false;
-  }
-
-  return feeds;
-}
-
-function updateView(html) {
-  if (container != null) {
-    container.innerHTML = html;
-  } else {
-    console.error('최상위 컨테이너가 없이 UI를 진행하지 못합니다.');
-  }
-} // 글목록을 가져오는 함수
-
-
-function newsFeed() {
-  // class를 사용해 가독성을 올릴수 있다
-  var api = new NewsFeedApi();
-  var newsFeed = store.feeds;
-  var ul = document.createElement('ul'); //테그를 생성
-
-  var newsList = [];
-  var template = "\n  <div class=\"bg-gray-600 min-h-screen\">\n      <div class=\"bg-white text-xl\">\n        <div class=\"mx-auto px-4\">\n          <div class=\"flex justify-between items-center py-6\">\n            <div class=\"flex justify-start\">\n              <h1 class=\"font-extrabold\">Hacker News</h1>\n            </div>\n            <div class=\"items-center justify-end\">\n              <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n                Previous\n              </a>\n              <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n                Next\n              </a>\n            </div>\n          </div> \n        </div>\n      </div>\n      <div class=\"p-4 text-2xl text-gray-700\">\n        {{__news_feed__}}        \n      </div>\n    </div>\n  "; //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
-
-  if (newsFeed.length === 0) {
-    newsFeed = store.feeds = makeFeeds(api.getData());
-  }
-
-  console.log(newsFeed[0]);
-
-  for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
-    newsList.push("\n    <div class=\"p-6 ".concat(newsFeed[i].read ? 'bg-green-500' : 'bg-white', " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n        <div class=\"flex\">\n          <div class=\"flex-auto\">\n            <a href=\"#/show/").concat(newsFeed[i].id, "\">").concat(newsFeed[i].title, "</a>  \n          </div>\n          <div class=\"text-center text-sm\">\n            <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">").concat(newsFeed[i].comments_count, "</div>\n          </div>\n        </div>\n        <div class=\"flex mt-3\">\n          <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n            <div><i class=\"fas fa-user mr-1\"></i>").concat(newsFeed[i].user, "</div>\n            <div><i class=\"fas fa-heart mr-1\"></i>").concat(newsFeed[i].points, "</div>\n            <div><i class=\"far fa-clock mr-1\"></i>").concat(newsFeed[i].time_ago, "</div>\n          </div>  \n        </div>\n      </div>    \n  "));
-  }
-
-  template = template.replace('{{__news_feed__}}', newsList.join('')); // 마크업을 대체
-
-  template = template.replace('{{__prev_page__}}', String(store.currentPage > 1 ? store.currentPage - 1 : 1));
-  template = template.replace('{{__next_page__}}', String(store.currentPage + 1));
-  updateView(template);
-} //읽는곳
-
-
-function newsDetail() {
-  var id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
-
-  var api = new NewsDetailApi();
-  var newsContent = api.getData(id);
-  var template = "\n  <div class=\"bg-gray-600 min-h-screen pb-8\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/".concat(store.currentPage, "\" class=\"text-gray-500\">\n            <i class=\"fa fa-times\"></i>\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n    <h2>").concat(newsContent.title, "</h2>\n    <div class=\"text-gray-400 h-20\">\n      ").concat(newsContent.content, "\n    </div>\n\n    {{__comments__}}\n\n  </div>\n</div>\n  ");
-
-  for (var i = 0; i < store.feeds.length; i++) {
-    if (store.feeds[i].id === Number(id)) {
-      store.feeds[i].read = true;
-      break;
+    if (!containerElement) {
+      throw '최상위 컨테이너가 없어 UI를 진행하지 못합니다.'; // 종료
     }
+
+    this.container = containerElement;
+    this.template = template;
+    this.renderTemplate = template;
+    this.htmlList = [];
+  } //메소드
+  // 슈퍼클래스 기능 요소 - container에 innerHtml에 데이터를 넣고 있음
+
+
+  View.prototype.updateView = function () {
+    this.container.innerHTML = this.renderTemplate;
+    this.renderTemplate = this.template; // setTemplateData 전 초기 값으로
+  }; //html 조각을 추가
+
+
+  View.prototype.addHtml = function (htmlString) {
+    this.htmlList.push(htmlString);
+  };
+
+  View.prototype.getHtml = function () {
+    var snapshot = this.htmlList.join('');
+    this.clearHtmlList();
+    return snapshot;
+  }; // key를 받아 데이터 변환
+
+
+  View.prototype.setTemplateData = function (key, value) {
+    this.renderTemplate = this.renderTemplate.replace("{{__".concat(key, "__}}"), value);
+  };
+
+  View.prototype.clearHtmlList = function () {
+    this.htmlList = []; // newsfeedview와 Newsdetail에서 사용이 되며 값을 한번 add가 되어지고 있기 때문에 한번 초기화 해줘야한다.
+  };
+
+  return View;
+}(); // 화면전환 location.hash에서 #은 빈값을 반환함
+
+
+var Router =
+/** @class */
+function () {
+  function Router() {
+    // this.route 의 경우에는 브라우저의 이벤트시스템이 호출하게됨
+    // 이 호출 시의 route는 라우터의 instance가 아니고
+    // defaultRouter나 routerTable 정보에 접근이 불가능함
+    // 현재 등록 시점을 고정 시켜주기 위해 bind를 사용
+    window.addEventListener('hashchange', this.route.bind(this));
+    this.routeTable = [];
+    this.defaultRoute = null;
   }
 
-  updateView(template.replace('{{__comments__}}', makeComment(newsContent.comments)));
-}
+  Router.prototype.setDefaultPage = function (page) {
+    this.defaultRoute = {
+      path: '',
+      page: page
+    };
+  };
 
-function makeComment(comments) {
-  var commentString = [];
+  Router.prototype.addRoutePath = function (path, page) {
+    this.routeTable.push({
+      path: path,
+      page: page
+    });
+  };
 
-  for (var i = 0; i < comments.length; i++) {
-    var comment = comments[i];
-    commentString.push("\n      <div style=\"padding-left: ".concat(comment.level * 40, "px;\" class=\"mt-4\">\n        <div class=\"text-gray-400\">\n          <i class=\"fa fa-sort-up mr-2\"></i>\n          <strong>").concat(comment.user, "</strong> ").concat(comment.time_ago, "\n        </div>\n        <p class=\"text-gray-700\">").concat(comment.content, "</p>\n      </div>      \n    ")); // 대댓글을 가져옴
+  Router.prototype.route = function () {
+    var e_1, _a;
 
-    if (comments[i].comments.length > 0) {
-      commentString.push(makeComment(comments[i].comments)); // 재귀 호출 하위의 comment가 없을때까지 호출
+    var routePath = location.hash;
+
+    if (routePath === '' && this.defaultRoute) {
+      this.defaultRoute.page.render();
     }
+
+    try {
+      for (var _b = __values(this.routeTable), _c = _b.next(); !_c.done; _c = _b.next()) {
+        var routeInfo = _c.value;
+
+        if (routePath.indexOf(routeInfo.path) >= 0) {
+          routeInfo.page.render();
+          break;
+        }
+      }
+    } catch (e_1_1) {
+      e_1 = {
+        error: e_1_1
+      };
+    } finally {
+      try {
+        if (_c && !_c.done && (_a = _b.return)) _a.call(_b);
+      } finally {
+        if (e_1) throw e_1.error;
+      }
+    }
+  };
+
+  return Router;
+}(); // 글목록을 표시 하는 클래스
+
+
+var NewsFeedView =
+/** @class */
+function (_super) {
+  __extends(NewsFeedView, _super);
+
+  function NewsFeedView(containerId) {
+    var _this = this;
+
+    var template = "\n      <div class=\"bg-gray-600 min-h-screen\">\n          <div class=\"bg-white text-xl\">\n            <div class=\"mx-auto px-4\">\n              <div class=\"flex justify-between items-center py-6\">\n                <div class=\"flex justify-start\">\n                  <h1 class=\"font-extrabold\">Hacker News</h1>\n                </div>\n                <div class=\"items-center justify-end\">\n                  <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n                    Previous\n                  </a>\n                  <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n                    Next\n                  </a>\n                </div>\n              </div> \n            </div>\n          </div>\n          <div class=\"p-4 text-2xl text-gray-700\">\n            {{__news_feed__}}        \n          </div>\n        </div>\n      ";
+    _this = _super.call(this, containerId, template) || this;
+    _this.api = new NewsFeedApi(NEWS_URL);
+    _this.feeds = store.feeds; //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
+
+    if (_this.feeds.length === 0) {
+      _this.feeds = store.feeds = _this.api.getData();
+
+      _this.makeFeeds(); // 리드속성 추가
+
+    }
+
+    return _this;
+  } // 화면 그려주는 부분
+
+
+  NewsFeedView.prototype.render = function () {
+    store.currentPage = Number(location.hash.substring(7) || 1);
+
+    for (var i = (store.currentPage - 1) * 10; i < store.currentPage * 10; i++) {
+      var _a = this.feeds[i],
+          read = _a.read,
+          id = _a.id,
+          title = _a.title,
+          comments_count = _a.comments_count,
+          user = _a.user,
+          points = _a.points,
+          time_ago = _a.time_ago;
+      this.addHtml("\n    <div class=\"p-6 ".concat(read ? 'bg-green-500' : 'bg-white', " mt-6 rounded-lg shadow-md transition-colors duration-500 hover:bg-green-100\">\n        <div class=\"flex\">\n          <div class=\"flex-auto\">\n            <a href=\"#/show/").concat(id, "\">").concat(title, "</a>  \n          </div>\n          <div class=\"text-center text-sm\">\n            <div class=\"w-10 text-white bg-green-300 rounded-lg px-0 py-2\">").concat(comments_count, "</div>\n          </div>\n        </div>\n        <div class=\"flex mt-3\">\n          <div class=\"grid grid-cols-3 text-sm text-gray-500\">\n            <div><i class=\"fas fa-user mr-1\"></i>").concat(user, "</div>\n            <div><i class=\"fas fa-heart mr-1\"></i>").concat(points, "</div>\n            <div><i class=\"far fa-clock mr-1\"></i>").concat(time_ago, "</div>\n          </div>  \n        </div>\n      </div>    \n  "));
+    }
+
+    this.setTemplateData('news_feed', this.getHtml());
+    this.setTemplateData('prev_page', String(store.currentPage > 1 ? store.currentPage - 1 : 1));
+    this.setTemplateData('next_page', String(store.currentPage + 1));
+    this.updateView();
+  }; // 리스트에 읽음상태 추가
+
+
+  NewsFeedView.prototype.makeFeeds = function () {
+    for (var i = 0; i < this.feeds.length; i++) {
+      this.feeds[i].read = false;
+    }
+  };
+
+  return NewsFeedView;
+}(View); //읽는 곳
+
+
+var NewsDetailView =
+/** @class */
+function (_super) {
+  __extends(NewsDetailView, _super);
+
+  function NewsDetailView(containerId) {
+    var _this = this;
+
+    var template = "\n  <div class=\"bg-gray-600 min-h-screen pb-8\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/{{__currentPage__}}\" class=\"text-gray-500\">\n            <i class=\"fa fa-times\"></i>\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n    <h2>{{__title__}}</h2>\n    <div class=\"text-gray-400 h-20\">\n      {{__content__}}\n    </div>\n\n    {{__comments__}}\n\n  </div>\n</div>\n  ";
+    _this = _super.call(this, containerId, template) || this;
+    return _this;
   }
 
-  return commentString.join('');
-} // 화면전환 location.hash에서 #은 빈값을 반환함
+  NewsDetailView.prototype.render = function () {
+    var id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
 
+    var api = new NewsDetailApi(CONTENT_URL.replace('@id', id));
+    var newsDetail = api.getData();
 
-function router() {
-  var routePath = location.hash;
+    for (var i = 0; i < store.feeds.length; i++) {
+      if (store.feeds[i].id === Number(id)) {
+        store.feeds[i].read = true;
+        break;
+      }
+    }
 
-  if (routePath === '') {
-    newsFeed();
-  } else if (routePath.indexOf('#/page/') >= 0) {
-    store.currentPage = Number(routePath.substring(7)); //indexOf 입력 문자열을 찾아 없으면 -1 값 아니면 위치 값을 전달
+    this.setTemplateData('comments', this.makeComment(newsDetail.comments));
+    this.setTemplateData('currentPage', String(store.currentPage));
+    this.setTemplateData('title', newsDetail.title);
+    this.setTemplateData('currentPage', String(store.currentPage));
+    this.updateView();
+  };
 
-    newsFeed();
-  } else {
-    newsDetail();
-  }
-} // #은 해시 해시가 바뀌었을때 이벤트가 발생 hashchange 이벤트를 사용(window에서 발생)
+  NewsDetailView.prototype.makeComment = function (comments) {
+    for (var i = 0; i < comments.length; i++) {
+      var comment = comments[i];
+      this.addHtml("\n        <div style=\"padding-left: ".concat(comment.level * 40, "px;\" class=\"mt-4\">\n          <div class=\"text-gray-400\">\n            <i class=\"fa fa-sort-up mr-2\"></i>\n            <strong>").concat(comment.user, "</strong> ").concat(comment.time_ago, "\n          </div>\n          <p class=\"text-gray-700\">").concat(comment.content, "</p>\n        </div>      \n      ")); // 대댓글을 가져옴
 
+      if (comment.comments.length > 0) {
+        this.addHtml(this.makeComment(comments[i].comments)); // 재귀 호출 하위의 comment가 없을때까지 호출
+      }
+    }
 
-window.addEventListener('hashchange', router);
-router();
+    return this.getHtml();
+  };
+
+  return NewsDetailView;
+}(View);
+
+var router = new Router();
+var newsFeedView = new NewsFeedView('root');
+var newsDetailView = new NewsDetailView('root');
+router.setDefaultPage(newsFeedView);
+router.addRoutePath('/page/', newsFeedView);
+router.addRoutePath('/show/', newsDetailView);
+router.route();
 },{}],"../../../.config/yarn/global/node_modules/parcel-bundler/src/builtins/hmr-runtime.js":[function(require,module,exports) {
 var global = arguments[3];
 var OVERLAY_ID = '__parcel__error__overlay__';
