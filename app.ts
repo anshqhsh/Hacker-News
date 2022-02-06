@@ -1,32 +1,31 @@
-//type alias
-type Store = {
+//type alias interface는 = 을 지우면 됨
+interface Store {
   currentPage: number;
   feeds: NewsFeed[]; // 생성한 newsFeed라는 형식이 들어가는 배열이라는 뜻
-  maxPage: number;
-};
-type News = {
-  id: number;
-  time_ago: number;
-  title: string;
-  url: string;
-  user: string;
-  content: string;
-};
+}
+interface News {
+  readonly id: number;
+  readonly time_ago: number;
+  readonly title: string;
+  readonly url: string;
+  readonly user: string;
+  readonly content: string;
+}
 
-type NewsFeed = News & {
-  comments_count: number;
-  points: number;
+interface NewsFeed extends News {
+  readonly comments_count: number;
+  readonly points: number;
   read?: boolean; // optional 속성
-};
+}
 
-type NewsDetail = News & {
-  comments: NewsComment[];
-};
+interface NewsDetail extends News {
+  readonly comments: NewsComment[];
+}
 
-type NewsComment = News & {
-  comments: NewsComment[];
-  level: number;
-};
+interface NewsComment extends News {
+  readonly comments: NewsComment[];
+  readonly level: number;
+}
 
 const container: HTMLElement | null = document.getElementById('root'); //id값이 root를 불러옴
 const ajax: XMLHttpRequest = new XMLHttpRequest();
@@ -37,8 +36,39 @@ const CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json';
 const store: Store = {
   currentPage: 1,
   feeds: [], //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
-  maxPage: 0,
 };
+
+// 공통요소로 네트워크로 api를 호출
+class Api {
+  // 내부 저장
+  url: string;
+  ajax: XMLHttpRequest;
+  // 클래스는 초기화 과정이 필요 url, XMLHttpRequest
+  // instance 객체에 저장
+  constructor(url: string) {
+    this.url = url;
+    this.ajax = new XMLHttpRequest();
+  }
+
+  protected getRequest<AjaxResponse>(): AjaxResponse {
+    this.ajax.open('GET', this.url, false); // 데이터를 동기적으로 가져옴
+    this.ajax.send(); //데이터를 가져옴
+
+    return JSON.parse(this.ajax.response); // json형식으로 변환
+  }
+}
+// 클래스를 통해서 더 확실한 목적을 갖게됨
+class NewsFeedApi extends Api {
+  getData(): NewsFeed[] {
+    return this.getRequest<NewsFeed[]>();
+  }
+}
+
+class NewsDetailApi extends Api {
+  getData(): NewsDetail {
+    return this.getRequest<NewsDetail>();
+  }
+}
 
 // Generic 리턴값을 여러개 같을 경우가 존재해 사용하는곳에서 타입가드를 해줘야하지만
 // 제네릭을 통해 입력이 n개 유형일때 출력이 n개 유형인것을 표현 가능하다.
@@ -47,7 +77,6 @@ const store: Store = {
 function getData<AjaxResponse>(url: string): AjaxResponse {
   ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
   ajax.send(); //데이터를 가져옴
-  store.maxPage = JSON.parse(ajax.response).length / 10;
 
   return JSON.parse(ajax.response); // json형식으로 변환
 }
@@ -70,6 +99,9 @@ function updateView(html: string): void {
 
 // 글목록을 가져오는 함수
 function newsFeed(): void {
+  // class를 사용해 가독성을 올릴수 있다
+  const api = new NewsFeedApi(NEWS_URL);
+
   let newsFeed: NewsFeed[] = store.feeds;
   const ul = document.createElement('ul'); //테그를 생성
 
@@ -102,7 +134,7 @@ function newsFeed(): void {
 
   //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
   if (newsFeed.length === 0) {
-    newsFeed = store.feeds = makeFeeds(getData<NewsFeed[]>(NEWS_URL));
+    newsFeed = store.feeds = makeFeeds(api.getData());
   }
   console.log(newsFeed[0]);
 
@@ -139,9 +171,7 @@ function newsFeed(): void {
   );
   template = template.replace(
     '{{__next_page__}}',
-    String(
-      store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage
-    )
+    String(store.currentPage + 1)
   );
 
   updateView(template);
@@ -150,7 +180,8 @@ function newsFeed(): void {
 //읽는곳
 function newsDetail(): void {
   const id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
-  const newsContent = getData<NewsDetail>(CONTENT_URL.replace('@id', id));
+  const api = new NewsDetailApi(CONTENT_URL.replace('@id', id));
+  const newsContent = api.getData();
 
   let template = `
   <div class="bg-gray-600 min-h-screen pb-8">

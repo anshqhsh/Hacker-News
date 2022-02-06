@@ -120,6 +120,34 @@ parcelRequire = (function (modules, cache, entry, globalName) {
 })({"app.ts":[function(require,module,exports) {
 "use strict";
 
+var __extends = this && this.__extends || function () {
+  var _extendStatics = function extendStatics(d, b) {
+    _extendStatics = Object.setPrototypeOf || {
+      __proto__: []
+    } instanceof Array && function (d, b) {
+      d.__proto__ = b;
+    } || function (d, b) {
+      for (var p in b) {
+        if (Object.prototype.hasOwnProperty.call(b, p)) d[p] = b[p];
+      }
+    };
+
+    return _extendStatics(d, b);
+  };
+
+  return function (d, b) {
+    if (typeof b !== "function" && b !== null) throw new TypeError("Class extends value " + String(b) + " is not a constructor or null");
+
+    _extendStatics(d, b);
+
+    function __() {
+      this.constructor = d;
+    }
+
+    d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
+  };
+}();
+
 var container = document.getElementById('root'); //id값이 root를 불러옴
 
 var ajax = new XMLHttpRequest();
@@ -129,19 +157,73 @@ var CONTENT_URL = 'https://api.hnpwa.com/v0/item/@id.json'; // 공유되는 값�
 
 var store = {
   currentPage: 1,
-  feeds: [],
-  maxPage: 0
-}; // Generic 리턴값을 여러개 같을 경우가 존재해 사용하는곳에서 타입가드를 해줘야하지만
+  feeds: [] //페이지 변경 마다 데이터를 가져오기 때문에 줄여주기 위해 배열을 이용
+
+}; // 공통요소로 네트워크로 api를 호출
+
+var Api =
+/** @class */
+function () {
+  // 클래스는 초기화 과정이 필요 url, XMLHttpRequest
+  // instance 객체에 저장
+  function Api(url) {
+    this.url = url;
+    this.ajax = new XMLHttpRequest();
+  }
+
+  Api.prototype.getRequest = function () {
+    this.ajax.open('GET', this.url, false); // 데이터를 동기적으로 가져옴
+
+    this.ajax.send(); //데이터를 가져옴
+
+    return JSON.parse(this.ajax.response); // json형식으로 변환
+  };
+
+  return Api;
+}(); // 클래스를 통해서 더 확실한 목적을 갖게됨
+
+
+var NewsFeedApi =
+/** @class */
+function (_super) {
+  __extends(NewsFeedApi, _super);
+
+  function NewsFeedApi() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+
+  NewsFeedApi.prototype.getData = function () {
+    return this.getRequest();
+  };
+
+  return NewsFeedApi;
+}(Api);
+
+var NewsDetailApi =
+/** @class */
+function (_super) {
+  __extends(NewsDetailApi, _super);
+
+  function NewsDetailApi() {
+    return _super !== null && _super.apply(this, arguments) || this;
+  }
+
+  NewsDetailApi.prototype.getData = function () {
+    return this.getRequest();
+  };
+
+  return NewsDetailApi;
+}(Api); // Generic 리턴값을 여러개 같을 경우가 존재해 사용하는곳에서 타입가드를 해줘야하지만
 // 제네릭을 통해 입력이 n개 유형일때 출력이 n개 유형인것을 표현 가능하다.
 // T라는 형식의 데이터의 리턴 값을 받겠다고 사용하는 곳에서 정의 내릴 수 있다.
 //네트워크를 통해 데이터를 가져와 객체로 변경
+
 
 function getData(url) {
   ajax.open('GET', url, false); // 데이터를 동기적으로 가져옴
 
   ajax.send(); //데이터를 가져옴
 
-  store.maxPage = JSON.parse(ajax.response).length / 10;
   return JSON.parse(ajax.response); // json형식으로 변환
 } // 리스트에 읽음상태 추가
 
@@ -164,6 +246,8 @@ function updateView(html) {
 
 
 function newsFeed() {
+  // class를 사용해 가독성을 올릴수 있다
+  var api = new NewsFeedApi(NEWS_URL);
   var newsFeed = store.feeds;
   var ul = document.createElement('ul'); //테그를 생성
 
@@ -171,7 +255,7 @@ function newsFeed() {
   var template = "\n  <div class=\"bg-gray-600 min-h-screen\">\n      <div class=\"bg-white text-xl\">\n        <div class=\"mx-auto px-4\">\n          <div class=\"flex justify-between items-center py-6\">\n            <div class=\"flex justify-start\">\n              <h1 class=\"font-extrabold\">Hacker News</h1>\n            </div>\n            <div class=\"items-center justify-end\">\n              <a href=\"#/page/{{__prev_page__}}\" class=\"text-gray-500\">\n                Previous\n              </a>\n              <a href=\"#/page/{{__next_page__}}\" class=\"text-gray-500 ml-4\">\n                Next\n              </a>\n            </div>\n          </div> \n        </div>\n      </div>\n      <div class=\"p-4 text-2xl text-gray-700\">\n        {{__news_feed__}}        \n      </div>\n    </div>\n  "; //store에 리스트를 생성하여 서버에서 한번만 불러오게끔
 
   if (newsFeed.length === 0) {
-    newsFeed = store.feeds = makeFeeds(getData(NEWS_URL));
+    newsFeed = store.feeds = makeFeeds(api.getData());
   }
 
   console.log(newsFeed[0]);
@@ -183,7 +267,7 @@ function newsFeed() {
   template = template.replace('{{__news_feed__}}', newsList.join('')); // 마크업을 대체
 
   template = template.replace('{{__prev_page__}}', String(store.currentPage > 1 ? store.currentPage - 1 : 1));
-  template = template.replace('{{__next_page__}}', String(store.currentPage < store.maxPage ? store.currentPage + 1 : store.maxPage));
+  template = template.replace('{{__next_page__}}', String(store.currentPage + 1));
   updateView(template);
 } //읽는곳
 
@@ -191,7 +275,8 @@ function newsFeed() {
 function newsDetail() {
   var id = location.hash.substring(7); // 주소와 관련된 데이터를 전달 #을 제거한 값을 출력
 
-  var newsContent = getData(CONTENT_URL.replace('@id', id));
+  var api = new NewsDetailApi(CONTENT_URL.replace('@id', id));
+  var newsContent = api.getData();
   var template = "\n  <div class=\"bg-gray-600 min-h-screen pb-8\">\n  <div class=\"bg-white text-xl\">\n    <div class=\"mx-auto px-4\">\n      <div class=\"flex justify-between items-center py-6\">\n        <div class=\"flex justify-start\">\n          <h1 class=\"font-extrabold\">Hacker News</h1>\n        </div>\n        <div class=\"items-center justify-end\">\n          <a href=\"#/page/".concat(store.currentPage, "\" class=\"text-gray-500\">\n            <i class=\"fa fa-times\"></i>\n          </a>\n        </div>\n      </div>\n    </div>\n  </div>\n\n  <div class=\"h-full border rounded-xl bg-white m-6 p-4 \">\n    <h2>").concat(newsContent.title, "</h2>\n    <div class=\"text-gray-400 h-20\">\n      ").concat(newsContent.content, "\n    </div>\n\n    {{__comments__}}\n\n  </div>\n</div>\n  ");
 
   for (var i = 0; i < store.feeds.length; i++) {
