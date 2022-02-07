@@ -27,7 +27,6 @@ export default class Router {
 
     if (!this.isStart) {
       this.isStart = true;
-      // Execute next tick
       setTimeout(this.route.bind(this), 0);
     }
   }

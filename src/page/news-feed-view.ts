@@ -1,6 +1,6 @@
 import View from '../core/view';
 import { NewsFeedApi } from '../core/api';
-import { NewsStore } from '../types';
+import { NewsFeed, NewsStore } from '../types';
 import { NEWS_URL } from '../config';
 
 const template = `
@@ -37,15 +37,20 @@ export default class NewsFeedView extends View {
 
     this.store = store;
     this.api = new NewsFeedApi(NEWS_URL);
-
-    if (!this.store.hasFeeds) {
-      this.store.setFeeds(this.api.getData());
-    }
   }
-
+  // 라우터가 render호출 생성자 -> api -> 라우터 -> render :아직 데이터가 안온상태에서 reder가 실행될수도있다
   render = (page: string = '1'): void => {
     this.store.currentPage = Number(page);
 
+    if (!this.store.hasFeeds) {
+      this.api.getDataWithPromise((feeds: NewsFeed[]) => {
+        this.store.setFeeds(feeds);
+        this.renderView();
+      });
+    }
+    this.renderView();
+  };
+  renderView = () => {
     for (
       let i = (this.store.currentPage - 1) * 10;
       i < this.store.currentPage * 10;

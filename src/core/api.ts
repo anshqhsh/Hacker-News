@@ -1,19 +1,29 @@
 import { NewsFeed, NewsDetail } from '../types';
 
 export default class Api {
-  ajax: XMLHttpRequest;
+  xhr: XMLHttpRequest;
   url: string;
 
   constructor(url: string) {
-    this.ajax = new XMLHttpRequest();
+    this.xhr = new XMLHttpRequest();
     this.url = url;
   }
 
-  getRequest<AjaxResponse>(): AjaxResponse {
-    this.ajax.open('GET', this.url, false);
-    this.ajax.send();
+  getRequestwithXHR<AjaxResponse>(cb: (data: AjaxResponse) => void): void {
+    this.xhr.open('GET', this.url); // 3번째인자가 동기/비동기
+    this.xhr.addEventListener('load', () => {
+      cb(JSON.parse(this.xhr.response) as AjaxResponse);
+    });
 
-    return JSON.parse(this.ajax.response) as AjaxResponse;
+    this.xhr.send();
+  }
+  getRequestwithPromise<AjaxResponse>(cb: (data: AjaxResponse) => void): void {
+    fetch(this.url)
+      .then(response => response.json())
+      .then(cb)
+      .catch(() => {
+        console.error('데이터를 불러오지 못했습니다.');
+      });
   }
 }
 
@@ -22,8 +32,12 @@ export class NewsFeedApi extends Api {
     super(url);
   }
 
-  getData(): NewsFeed[] {
-    return this.getRequest<NewsFeed[]>();
+  getDataWithXHR(cb: (data: NewsFeed[]) => void): void {
+    return this.getRequestwithXHR<NewsFeed[]>(cb);
+  }
+
+  getDataWithPromise(cb: (data: NewsFeed[]) => void): void {
+    return this.getRequestwithXHR<NewsFeed[]>(cb);
   }
 }
 
@@ -32,7 +46,10 @@ export class NewsDetailApi extends Api {
     super(url);
   }
 
-  getData(): NewsDetail {
-    return this.getRequest<NewsDetail>();
+  getDataWithXHR(cb: (data: NewsDetail) => void): void {
+    return this.getRequestwithPromise<NewsDetail>(cb);
+  }
+  getDataWithPromise(cb: (data: NewsDetail) => void): void {
+    return this.getRequestwithPromise<NewsDetail>(cb);
   }
 }
