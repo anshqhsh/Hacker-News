@@ -1,36 +1,57 @@
 import { RouteInfo } from '../types';
 import View from './view';
 
-// 화면전환 location.hash에서 #은 빈값을 반환함
 export default class Router {
-  routeTable: RouteInfo[];
+  private isStart: boolean;
   defaultRoute: RouteInfo | null;
+  routeTable: RouteInfo[];
 
   constructor() {
-    // this.route 의 경우에는 브라우저의 이벤트시스템이 호출하게됨
-    // 이 호출 시의 route는 라우터의 instance가 아니고
-    // defaultRouter나 routerTable 정보에 접근이 불가능함
-    // 현재 등록 시점을 고정 시켜주기 위해 bind를 사용
     window.addEventListener('hashchange', this.route.bind(this));
 
-    this.routeTable = [];
+    this.isStart = false;
     this.defaultRoute = null;
+    this.routeTable = [];
   }
-  setDefaultPage(page: View): void {
-    this.defaultRoute = { path: '', page };
+
+  setDefaultPage(page: View, params: RegExp | null = null): void {
+    this.defaultRoute = {
+      path: '',
+      page,
+      params,
+    };
   }
-  addRoutePath(path: string, page: View): void {
-    this.routeTable.push({ path, page });
+
+  addRoutePath(path: string, page: View, params: RegExp | null = null): void {
+    this.routeTable.push({ path, page, params });
+
+    if (!this.isStart) {
+      this.isStart = true;
+      // Execute next tick
+      setTimeout(this.route.bind(this), 0);
+    }
   }
-  route() {
-    const routePath = location.hash;
+
+  private route() {
+    const routePath: string = location.hash;
+
     if (routePath === '' && this.defaultRoute) {
       this.defaultRoute.page.render();
+      return;
     }
+
     for (const routeInfo of this.routeTable) {
       if (routePath.indexOf(routeInfo.path) >= 0) {
-        routeInfo.page.render();
-        break;
+        if (routeInfo.params) {
+          const parseParams = routePath.match(routeInfo.params);
+
+          if (parseParams) {
+            routeInfo.page.render.apply(null, [parseParams[1]]);
+          }
+        } else {
+          routeInfo.page.render();
+        }
+        return;
       }
     }
   }
