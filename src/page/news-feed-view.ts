@@ -39,18 +39,13 @@ export default class NewsFeedView extends View {
     this.api = new NewsFeedApi(NEWS_URL);
   }
   // 라우터가 render호출 생성자 -> api -> 라우터 -> render :아직 데이터가 안온상태에서 reder가 실행될수도있다
-  render = (page: string = '1'): void => {
+  render = async (page: string = '1'): Promise<void> => {
     this.store.currentPage = Number(page);
 
     if (!this.store.hasFeeds) {
-      this.api.getDataWithPromise((feeds: NewsFeed[]) => {
-        this.store.setFeeds(feeds);
-        this.renderView();
-      });
+      this.store.setFeeds(await this.api.getData());
     }
-    this.renderView();
-  };
-  renderView = () => {
+
     for (
       let i = (this.store.currentPage - 1) * 10;
       i < this.store.currentPage * 10;
